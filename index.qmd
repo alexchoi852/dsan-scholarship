@@ -1,0 +1,174 @@
+---
+title: "Analyzing Climate Change Impact on Vegetation Dynamics in the Four Corners Region"
+format:
+  html:
+    embed-resources: true
+---
+
+
+```{python, echo=False}
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+```
+
+
+Climate change brings significant challenges to ecosystems all over the world, where the behavior of vegetation is a key indicator of ecological sustainability. This data visualization project shows the impact of climate factors on vegetation cover within the Four Corners region. 
+
+
+## Loading the Data
+
+The data utilized in this project:
+
+- Climate and Drought Data from NOAA provides important information on temperature, precipitation, and other climate variables. <br><br>
+- Vegetation Cover Data from USGS gathers vegetation cover with geographic and temporal variables, giving information about the ecological nature of the NBNM region.
+
+```{python}
+nearterm = pd.read_csv('data/nearterm_data_2020-2024.csv')
+historic = pd.read_csv('data/NABR_historic.csv')
+```
+
+```{python}
+nearterm.head()
+historic.head()
+```
+
+
+## Data Cleaning 
+
+```{python, echo=False}
+print(nearterm.isnull().sum())
+print(historic.isnull().sum())
+```
+
+Since there was a significant amount of missing data in both datasets, the columns consisting of more than 50% of missing data were dropped. For columns with 50% or less missing values, the missing data was imputed based on the column's median value. The rows with missing data after these processes were then dropped to result in the cleaned datasets ready for analysis. 
+
+```{python}
+nearterm_missing = nearterm.isna().mean().round(4) * 100
+historic_missing = historic.isna().mean().round(4) * 100
+
+print(nearterm_missing)
+print(historic_missing)
+
+t = 0.5
+
+nearterm_cleaned = nearterm.loc[:, nearterm.isna().mean() < t]
+historic_cleaned = historic.loc[:, historic.isna().mean() < t]
+
+nearterm_cleaned.fillna(nearterm_cleaned.median(), inplace=True)
+historic_cleaned.fillna(historic_cleaned.median(), inplace=True)
+
+nearterm_cleaned.dropna(inplace=True)
+historic_cleaned.dropna(inplace=True)
+
+print(nearterm_cleaned.isna().sum())
+print(historic_cleaned.isna().sum())
+```
+
+
+## Exploratory Data Analysis
+
+
+To begin exploring the data, the overall variability in shrub cover in the near-term data is shown below. To ensure clarity in the visuals, the top 5 scenarios based on shrub canopy cover were included in this EDA process for both datasets.
+
+
+```{python, echo=False}
+scenario_means = nearterm_cleaned.groupby('scenario')['Shrub'].mean().sort_values(ascending=False)
+top_scenarios_5 = scenario_means.head(5).index
+top_scenarios = nearterm_cleaned[nearterm_cleaned['scenario'].isin(top_scenarios_5)]
+
+
+plt.figure(figsize=(10, 6))
+sns.boxplot(data=top_scenarios, x='scenario', y='Shrub')
+plt.title('Distribution of Shrub Cover For Top 5 Scenarios')
+plt.xlabel('Scenario')
+plt.ylabel('Shrub Cover')
+plt.show()
+```
+
+
+Each of the scenarios appear to have similar distributions, so many of the scenarios seem to not differ and be impacted by the tree canopy cover. <br><br>
+
+In order to understand whether precipitation influences vegetation, the relationship between tree canopy cover and annual precipitation was visualized below. 
+
+
+```{python, echo=False}
+plt.figure(figsize=(10, 6))
+sns.scatterplot(data=nearterm_cleaned, x='PPT_Annual', y='treecanopy')
+plt.title('Tree Canopy Cover vs. Annual Precipitation')
+plt.xlabel('Annual Precipitation (mm)')
+plt.ylabel('Tree Canopy Cover')
+plt.legend(title='Scenario')
+plt.show()
+```
+
+There appears to be no relationship between the two variables as the points are randomly scattered in the plot. <br><br>
+
+For the historic data, in order to analyze past trends in tree canopy cover, a line plot was created below to show how tree canopy cover has changed over time for the top 5 scenarios. 
+
+```{python, echo=False}
+historic_scenario_means = historic_cleaned.groupby('scenario')['treecanopy'].mean().sort_values(ascending=False)
+historic_top_scenarios_5 = historic_scenario_means.head(5).index
+historic_top_scenarios = historic_cleaned[historic_cleaned['scenario'].isin(historic_top_scenarios_5)]
+
+plt.figure(figsize=(10, 6))
+sns.lineplot(data=historic_top_scenarios, x='year', y='treecanopy', hue='scenario', marker='o')
+plt.title('Tree Canopy Cover Over Time (Top 5 Historic Scenarios)')
+plt.xlabel('Year')
+plt.ylabel('Tree Canopy Cover')
+plt.legend(title='Scenario')
+plt.show()
+```
+
+The earlier years appear to have the most variability in the flucutations in the values between each year, but the sharp increases and decreases in the values are close to being constant. <br><br>
+
+These visuals show a broad understanding of the data. 
+
+
+## Interactive Visuals
+
+```{python, echo=False}
+import plotly.graph_objects as go
+
+scenario_means = nearterm_cleaned.groupby('scenario')['treecanopy'].mean().sort_values(ascending=False)
+top_scenarios_5 = scenario_means.head(5).index
+top_scenarios = nearterm_cleaned[nearterm_cleaned['scenario'].isin(top_scenarios_5)]
+
+fig = go.Figure()
+
+for scenario in top_scenarios_5:
+    df = top_scenarios[top_scenarios['scenario'] == scenario]
+    fig.add_trace(go.Histogram(x=df['PPT_Annual'], name=scenario, opacity=0.75))
+
+fig.update_layout(
+    title='Distribution of Annual Precipitation by Top 5 Scenario Based on Average Tree Canopy Cover',
+    xaxis_title='Annual Precipitation (mm)',
+    yaxis_title='Count',
+    legend_title='Scenario',
+    barmode='overlay'
+)
+fig.show()
+```
+
+They appear to be roughly distributed similarily. 
+
+```{python, echo=False}
+seasons = nearterm_cleaned['TimePeriod'].unique()
+
+fig = go.Figure()
+
+for season in seasons:
+    season_data = nearterm_cleaned[nearterm_cleaned['TimePeriod'] == season]
+    fig.add_trace(go.Scatter(x=season_data['year'], y=season_data['treecanopy'], mode='lines+markers', name=season))
+
+fig.update_layout(
+    title='Tree Canopy Cover by Season',
+    xaxis_title='Year',
+    yaxis_title='Tree Canopy Cover',
+    legend_title='Season'
+)
+
+fig.show()
+```
+
+There is a lot of variability over time. 
